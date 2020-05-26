@@ -31,6 +31,8 @@ import org.keycloak.services.util.CookieHelper;
 import org.keycloak.sessions.AuthenticationSessionModel;
 import org.keycloak.sessions.RootAuthenticationSessionModel;
 
+import static org.keycloak.common.util.ServerCookie.SameSiteAttributeValue;
+
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.UriInfo;
 import java.util.HashMap;
@@ -124,13 +126,13 @@ public class RestartLoginCookie implements Token {
         String encoded = session.tokens().encode(restart);
         String path = AuthenticationManager.getRealmCookiePath(realm, uriInfo);
         boolean secureOnly = realm.getSslRequired().isRequired(connection);
-        CookieHelper.addCookie(KC_RESTART, encoded, path, null, null, -1, secureOnly, true);
+        CookieHelper.addCookie(KC_RESTART, encoded, path, null, null, -1, secureOnly, true, SameSiteAttributeValue.NONE);
     }
 
     public static void expireRestartCookie(RealmModel realm, ClientConnection connection, UriInfo uriInfo) {
         String path = AuthenticationManager.getRealmCookiePath(realm, uriInfo);
         boolean secureOnly = realm.getSslRequired().isRequired(connection);
-        CookieHelper.addCookie(KC_RESTART, "", path, null, null, 0, secureOnly, true);
+        CookieHelper.addCookie(KC_RESTART, "", path, null, null, 0, secureOnly, true, SameSiteAttributeValue.NONE);
     }
 
 
