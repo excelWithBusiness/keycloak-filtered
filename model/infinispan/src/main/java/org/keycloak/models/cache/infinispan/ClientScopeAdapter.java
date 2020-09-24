@@ -17,7 +17,6 @@
 
 package org.keycloak.models.cache.infinispan;
 
-import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientScopeModel;
 import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.RealmModel;
@@ -29,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -157,14 +157,10 @@ public class ClientScopeAdapter implements ClientScopeModel {
         updated.setProtocol(protocol);
     }
 
-    public Set<RoleModel> getScopeMappings() {
-        if (isUpdated()) return updated.getScopeMappings();
-        Set<RoleModel> roles = new HashSet<>();
-        for (String id : cached.getScope()) {
-            roles.add(cacheSession.getRoleById(id, getRealm()));
-
-        }
-        return roles;
+    public Stream<RoleModel> getScopeMappingsStream() {
+        if (isUpdated()) return updated.getScopeMappingsStream();
+        return cached.getScope().stream()
+          .map(id -> cacheSession.getRoleById(id, cachedRealm));
     }
 
     public void addScopeMapping(RoleModel role) {
@@ -239,7 +235,7 @@ public class ClientScopeAdapter implements ClientScopeModel {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ClientModel)) return false;
+        if (!(o instanceof ClientScopeModel)) return false;
 
         ClientScopeModel that = (ClientScopeModel) o;
         return that.getId().equals(getId());

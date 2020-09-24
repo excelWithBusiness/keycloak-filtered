@@ -52,6 +52,7 @@ import org.keycloak.testsuite.util.OAuthClient;
 import org.keycloak.testsuite.util.SqlUtils;
 import org.keycloak.testsuite.util.SystemInfoHelper;
 import org.keycloak.testsuite.util.VaultUtils;
+import org.keycloak.testsuite.util.ServerURLs;
 import org.wildfly.extras.creaper.commands.undertow.AddUndertowListener;
 import org.wildfly.extras.creaper.commands.undertow.RemoveUndertowListener;
 import org.wildfly.extras.creaper.commands.undertow.SslVerifyClient;
@@ -84,7 +85,8 @@ import org.jboss.shrinkwrap.api.importer.ZipImporter;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 import org.jboss.shrinkwrap.resolver.api.maven.Maven;
 import org.junit.Assert;
-import static org.keycloak.testsuite.util.URLUtils.removeDefaultPorts;
+import static org.keycloak.testsuite.util.ServerURLs.getAuthServerContextRoot;
+import static org.keycloak.testsuite.util.ServerURLs.removeDefaultPorts;
 
 /**
  *
@@ -108,11 +110,6 @@ public class AuthServerTestEnricher {
     private JavaArchive testsuiteProvidersArchive;
     private String currentContainerName;
 
-    public static final boolean AUTH_SERVER_SSL_REQUIRED = Boolean.parseBoolean(System.getProperty("auth.server.ssl.required", "true"));
-    public static final String AUTH_SERVER_SCHEME = AUTH_SERVER_SSL_REQUIRED ? "https" : "http";
-    public static final String AUTH_SERVER_HOST = System.getProperty("auth.server.host", "localhost");
-    public static final String AUTH_SERVER_PORT = AUTH_SERVER_SSL_REQUIRED ? System.getProperty("auth.server.https.port", "8543") : System.getProperty("auth.server.http.port", "8180");
-
     public static final String AUTH_SERVER_CONTAINER_DEFAULT = "auth-server-undertow";
     public static final String AUTH_SERVER_CONTAINER_PROPERTY = "auth.server.container";
     public static final String AUTH_SERVER_CONTAINER = System.getProperty(AUTH_SERVER_CONTAINER_PROPERTY, AUTH_SERVER_CONTAINER_DEFAULT);
@@ -120,6 +117,8 @@ public class AuthServerTestEnricher {
     public static final String AUTH_SERVER_BACKEND_DEFAULT = AUTH_SERVER_CONTAINER + "-backend";
     public static final String AUTH_SERVER_BACKEND_PROPERTY = "auth.server.backend";
     public static final String AUTH_SERVER_BACKEND = System.getProperty(AUTH_SERVER_BACKEND_PROPERTY, AUTH_SERVER_BACKEND_DEFAULT);
+
+    public static final String AUTH_SERVER_LEGACY = "auth-server-legacy";
 
     public static final String AUTH_SERVER_BALANCER_DEFAULT = "auth-server-balancer";
     public static final String AUTH_SERVER_BALANCER_PROPERTY = "auth.server.balancer";
@@ -159,19 +158,8 @@ public class AuthServerTestEnricher {
         return AUTH_SERVER_CONTAINER.equals("auth-server-remote");
     }
 
-    public static String getAuthServerContextRoot() {
-        return getAuthServerContextRoot(0);
-    }
-
-    public static String getAuthServerContextRoot(int clusterPortOffset) {
-        String host = System.getProperty("auth.server.host", "localhost");
-        int httpPort = Integer.parseInt(System.getProperty("auth.server.http.port")); // property must be set
-        int httpsPort = Integer.parseInt(System.getProperty("auth.server.https.port")); // property must be set
-
-        String scheme = AUTH_SERVER_SSL_REQUIRED ? "https" : "http";
-        int port = AUTH_SERVER_SSL_REQUIRED ? httpsPort : httpPort;
-
-        return removeDefaultPorts(String.format("%s://%s:%s", scheme, host, port + clusterPortOffset));
+    public static boolean isAuthServerQuarkus() {
+        return AUTH_SERVER_CONTAINER.equals("auth-server-quarkus");
     }
 
     public static String getHttpAuthServerContextRoot() {
@@ -293,6 +281,15 @@ public class AuthServerTestEnricher {
                     updateWithAuthServerInfo(c, portOffset);
                     suiteContext.addAuthServerBackendsInfo(0, c);
                 });
+
+            if (Boolean.parseBoolean(System.getProperty("auth.server.jboss.legacy"))) {
+                ContainerInfo legacy = containers.stream()
+                    .filter(c -> c.getQualifier().startsWith(AUTH_SERVER_LEGACY))
+                    .findAny()
+                    .orElseThrow(() -> new IllegalStateException("Not found legacy container: " + AUTH_SERVER_LEGACY));
+                updateWithAuthServerInfo(legacy, 500);
+                suiteContext.setLegacyAuthServerInfo(legacy);
+            }
 
             if (suiteContext.getAuthServerBackendsInfo().isEmpty()) {
                 throw new RuntimeException(String.format("No auth server container matching '%s' found in arquillian.xml.", AUTH_SERVER_BACKEND));
@@ -511,7 +508,7 @@ public class AuthServerTestEnricher {
         TestContext testContext = new TestContext(suiteContext, event.getTestClass().getJavaClass());
         testContextProducer.set(testContext);
 
-        if (!isAuthServerRemote() && event.getTestClass().isAnnotationPresent(EnableVault.class)) {
+        if (!isAuthServerRemote() && !isAuthServerQuarkus() && event.getTestClass().isAnnotationPresent(EnableVault.class)) {
             VaultUtils.enableVault(suiteContext, event.getTestClass().getAnnotation(EnableVault.class).providerId());
             restartAuthServer();
             testContext.reconnectAdminClient();
@@ -527,7 +524,7 @@ public class AuthServerTestEnricher {
     }
 
     public static void initializeTLS(ContainerInfo containerInfo) {
-        if (AUTH_SERVER_SSL_REQUIRED && containerInfo.isJBossBased()) {
+        if (ServerURLs.AUTH_SERVER_SSL_REQUIRED && containerInfo.isJBossBased()) {
             log.infof("\n\n### Setting up TLS for %s ##\n\n", containerInfo);
             try {
                 OnlineManagementClient client = getManagementClient(containerInfo);

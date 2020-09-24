@@ -225,6 +225,11 @@ public class RepresentationToModel {
         if (rep.getClientSessionMaxLifespan() != null)
             newRealm.setClientSessionMaxLifespan(rep.getClientSessionMaxLifespan());
 
+        if (rep.getClientOfflineSessionIdleTimeout() != null)
+            newRealm.setClientOfflineSessionIdleTimeout(rep.getClientOfflineSessionIdleTimeout());
+        if (rep.getClientOfflineSessionMaxLifespan() != null)
+            newRealm.setClientOfflineSessionMaxLifespan(rep.getClientOfflineSessionMaxLifespan());
+
         if (rep.getAccessCodeLifespan() != null) newRealm.setAccessCodeLifespan(rep.getAccessCodeLifespan());
         else newRealm.setAccessCodeLifespan(60);
 
@@ -380,7 +385,7 @@ public class RepresentationToModel {
         if (rep.getBrowserSecurityHeaders() != null) {
             newRealm.setBrowserSecurityHeaders(rep.getBrowserSecurityHeaders());
         } else {
-            newRealm.setBrowserSecurityHeaders(BrowserSecurityHeaders.defaultHeaders);
+            newRealm.setBrowserSecurityHeaders(BrowserSecurityHeaders.realmDefaultHeaders);
         }
 
         if (rep.getComponents() != null) {
@@ -1097,6 +1102,10 @@ public class RepresentationToModel {
             realm.setClientSessionIdleTimeout(rep.getClientSessionIdleTimeout());
         if (rep.getClientSessionMaxLifespan() != null)
             realm.setClientSessionMaxLifespan(rep.getClientSessionMaxLifespan());
+        if (rep.getClientOfflineSessionIdleTimeout() != null)
+            realm.setClientOfflineSessionIdleTimeout(rep.getClientOfflineSessionIdleTimeout());
+        if (rep.getClientOfflineSessionMaxLifespan() != null)
+            realm.setClientOfflineSessionMaxLifespan(rep.getClientOfflineSessionMaxLifespan());
         if (rep.getRequiredCredentials() != null) {
             realm.updateRequiredCredentials(rep.getRequiredCredentials());
         }
@@ -1588,7 +1597,7 @@ public class RepresentationToModel {
     }
 
     public static ClientScopeModel createClientScope(KeycloakSession session, RealmModel realm, ClientScopeRepresentation resourceRep) {
-        logger.debug("Create client scope: {0}" + resourceRep.getName());
+        logger.debugv("Create client scope: {0}", resourceRep.getName());
 
         ClientScopeModel clientScope = resourceRep.getId() != null ? realm.addClientScope(resourceRep.getId(), resourceRep.getName()) : realm.addClientScope(resourceRep.getName());
         if (resourceRep.getName() != null) clientScope.setName(resourceRep.getName());

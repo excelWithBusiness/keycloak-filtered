@@ -121,8 +121,14 @@ public class UsersResource {
         if (session.users().getUserByUsername(username, realm) != null) {
             return ErrorResponse.exists("User exists with same username");
         }
-        if (rep.getEmail() != null && !realm.isDuplicateEmailsAllowed() && session.users().getUserByEmail(rep.getEmail(), realm) != null) {
-            return ErrorResponse.exists("User exists with same email");
+        if (rep.getEmail() != null && !realm.isDuplicateEmailsAllowed()) {
+            try {
+                if(session.users().getUserByEmail(rep.getEmail(), realm) != null) {
+                    return ErrorResponse.exists("User exists with same email");
+                }
+            } catch (ModelDuplicateException e) {
+                return ErrorResponse.exists("User exists with same email");
+            }
         }
 
         try {
@@ -189,6 +195,7 @@ public class UsersResource {
      * @param first
      * @param email
      * @param username
+     * @param enabled Boolean representing if user is enabled or not
      * @param first Pagination offset
      * @param maxResults Maximum results size (defaults to 100)
      * @return
@@ -203,7 +210,9 @@ public class UsersResource {
                                              @QueryParam("username") String username,
                                              @QueryParam("first") Integer firstResult,
                                              @QueryParam("max") Integer maxResults,
-                                             @QueryParam("briefRepresentation") Boolean briefRepresentation) {
+                                             @QueryParam("enabled") Boolean enabled,
+                                             @QueryParam("briefRepresentation") Boolean briefRepresentation,
+                                             @QueryParam("exact") Boolean exact) {
         UserPermissionEvaluator userPermissionEvaluator = auth.users();
 
         userPermissionEvaluator.requireQuery();
@@ -221,9 +230,12 @@ public class UsersResource {
             } else {
                 Map<String, String> attributes = new HashMap<>();
                 attributes.put(UserModel.SEARCH, search.trim());
+                if (enabled != null) {
+                    attributes.put(UserModel.ENABLED, enabled.toString());
+                }
                 return searchForUser(attributes, realm, userPermissionEvaluator, briefRepresentation, firstResult, maxResults, false);
             }
-        } else if (last != null || first != null || email != null || username != null) {
+        } else if (last != null || first != null || email != null || username != null || enabled != null || exact != null) {
             Map<String, String> attributes = new HashMap<>();
             if (last != null) {
                 attributes.put(UserModel.LAST_NAME, last);
@@ -236,6 +248,12 @@ public class UsersResource {
             }
             if (username != null) {
                 attributes.put(UserModel.USERNAME, username);
+            }
+            if (enabled != null) {
+                attributes.put(UserModel.ENABLED, enabled.toString());
+            }
+            if (exact != null) {
+                attributes.put(UserModel.EXACT, exact.toString());
             }
             return searchForUser(attributes, realm, userPermissionEvaluator, briefRepresentation, firstResult, maxResults, true);
         } else {

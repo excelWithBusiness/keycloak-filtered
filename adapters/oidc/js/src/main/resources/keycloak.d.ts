@@ -29,7 +29,6 @@ export = Keycloak;
 declare function Keycloak(config?: Keycloak.KeycloakConfig | string): Keycloak.KeycloakInstance;
 
 declare namespace Keycloak {
-	type KeycloakAdapterName = 'cordova' | 'cordova-native' |'default' | any;
 	type KeycloakOnLoad = 'login-required'|'check-sso';
 	type KeycloakResponseMode = 'query'|'fragment';
 	type KeycloakResponseType = 'code'|'id_token token'|'code id_token token';
@@ -60,13 +59,38 @@ declare namespace Keycloak {
 		useNonce?: boolean;
 
 		/**
-		 * Allows to use different adapter:
 		 * 
-		 * - {string} default - using browser api for redirects
-		 * - {string} cordova - using cordova plugins 
-		 * - {function} - allows to provide custom function as adapter.
+		 * Allow usage of different types of adapters or a custom adapter to make Keycloak work in different environments.
+		 *
+		 * The following options are supported:
+		 * - `default` - Use default APIs that are available in browsers.
+		 * - `cordova` - Use a WebView in Cordova.
+		 * - `cordova-native` - Use Cordova native APIs, this is recommended over `cordova`.
+		 *
+		 * It's also possible to pass in a custom adapter for the environment you are running Keycloak in. In order to do so extend the `KeycloakAdapter` interface and implement the methods that are defined there.
+		 *
+		 * For example:
+		 *
+		 * ```ts
+		 * import Keycloak, { KeycloakAdapter } from 'keycloak-js';
+		 *
+		 * // Implement the 'KeycloakAdapter' interface so that all required methods are guaranteed to be present.
+		 * const MyCustomAdapter: KeycloakAdapter = {
+		 * 	login(options) {
+		 * 		// Write your own implementation here.
+		 * 	}
+		 *
+		 * 	// The other methods go here...
+		 * };
+		 *
+		 * const keycloak = new Keycloak();
+		 *
+		 * keycloak.init({
+		 * 	adapter: MyCustomAdapter,
+		 * });
+		 * ```
 		 */
-		adapter?: KeycloakAdapterName;
+		adapter?: 'default' | 'cordova' | 'cordova-native' | KeycloakAdapter;
 		
 		/**
 		 * Specifies an action to do on load.
@@ -128,6 +152,13 @@ declare namespace Keycloak {
 		 * the specified uri is available whithin the application.
 		 */
 		silentCheckSsoRedirectUri?: string;
+
+		/**
+		 * Specifies whether the silent check-sso should fallback to "non-silent"
+		 * check-sso when 3rd party cookies are blocked by the browser. Defaults
+		 * to true.
+		 */
+		silentCheckSsoFallback?: boolean;
 
 		/**
 		 * Set the OpenID Connect flow.
@@ -215,9 +246,11 @@ declare namespace Keycloak {
 		redirectUri?: string;
 	}
 
+	interface KeycloakRegisterOptions extends Omit<KeycloakLoginOptions, 'action'> { }
+
 	type KeycloakPromiseCallback<T> = (result: T) => void;
 
-	class KeycloakPromise<TSuccess, TError> extends Promise<TSuccess> {
+	interface KeycloakPromise<TSuccess, TError> extends Promise<TSuccess> {
 		/**
 		 * Function to call if the promised action succeeds.
 		 * 
@@ -241,7 +274,7 @@ declare namespace Keycloak {
 	interface KeycloakAdapter {
 		login(options?: KeycloakLoginOptions): KeycloakPromise<void, void>;
 		logout(options?: KeycloakLogoutOptions): KeycloakPromise<void, void>;
-		register(options?: KeycloakLoginOptions): KeycloakPromise<void, void>;
+		register(options?: KeycloakRegisterOptions): KeycloakPromise<void, void>;
 		accountManagement(): KeycloakPromise<void, void>;
 		redirectUri(options: { redirectUri: string; }, encodeHash: boolean): string;
 	}
@@ -466,10 +499,9 @@ declare namespace Keycloak {
 
 		/**
 		 * Redirects to registration form.
-		 * @param options Supports same options as Keycloak#login but `action` is
-		 *                set to `'register'`.
+		 * @param options The options used for the registration.
 		 */
-		register(options?: any): KeycloakPromise<void, void>;
+		register(options?: KeycloakRegisterOptions): KeycloakPromise<void, void>;
 
 		/**
 		 * Redirects to the Account Management Console.
@@ -490,10 +522,9 @@ declare namespace Keycloak {
 
 		/**
 		 * Returns the URL to registration page.
-		 * @param options Supports same options as Keycloak#createLoginUrl but
-		 *                `action` is set to `'register'`.
+		 * @param options The options used for creating the registration URL.
 		 */
-		createRegisterUrl(options?: KeycloakLoginOptions): string;
+		createRegisterUrl(options?: KeycloakRegisterOptions): string;
 
 		/**
 		 * Returns the URL to the Account Management Console.

@@ -40,7 +40,6 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.testsuite.AssertEvents;
 import org.keycloak.testsuite.AbstractTestRealmKeycloakTest;
 import org.keycloak.testsuite.admin.ApiUtil;
-import org.keycloak.testsuite.arquillian.AuthServerTestEnricher;
 import org.keycloak.testsuite.console.page.AdminConsole;
 import org.keycloak.testsuite.pages.AccountUpdateProfilePage;
 import org.keycloak.testsuite.pages.AppPage;
@@ -68,7 +67,6 @@ import javax.ws.rs.core.UriBuilder;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 
@@ -83,6 +81,7 @@ import static org.keycloak.testsuite.admin.ApiUtil.findClientByClientId;
 import static org.keycloak.testsuite.util.OAuthClient.AUTH_SERVER_ROOT;
 import static org.keycloak.testsuite.util.OAuthClient.SERVER_ROOT;
 import static org.keycloak.testsuite.util.URLAssert.assertCurrentUrlStartsWithLoginUrlOf;
+import static org.keycloak.testsuite.util.ServerURLs.getAuthServerContextRoot;
 
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
@@ -163,14 +162,14 @@ public class LoginTest extends AbstractTestRealmKeycloakTest {
         Client client = ClientBuilder.newClient();
         Response response = client.target(oauth.getLoginFormUrl()).request().get();
         Assert.assertThat(response.getStatus(), is(equalTo(200)));
-        for (Map.Entry<String, String> entry : BrowserSecurityHeaders.defaultHeaders.entrySet()) {
-            String headerName = BrowserSecurityHeaders.headerAttributeMap.get(entry.getKey());
-            String headerValue = response.getHeaderString(headerName);
-            if (entry.getValue().isEmpty()) {
+        for (BrowserSecurityHeaders header : BrowserSecurityHeaders.values()) {
+            String headerValue = response.getHeaderString(header.getHeaderName());
+            String expectedValue = header.getDefaultValue();
+            if (expectedValue.isEmpty()) {
                 Assert.assertNull(headerValue);
             } else {
                 Assert.assertNotNull(headerValue);
-                Assert.assertThat(headerValue, is(equalTo(entry.getValue())));
+                Assert.assertThat(headerValue, is(equalTo(expectedValue)));
             }
         }
         response.close();
@@ -460,7 +459,7 @@ public class LoginTest extends AbstractTestRealmKeycloakTest {
 
         events.expectLogin().user(userId).detail(Details.USERNAME, "login-test").assertEvent();
 
-        driver.navigate().to(AuthServerTestEnricher.getAuthServerContextRoot() + "/auth/realms/test/");
+        driver.navigate().to(getAuthServerContextRoot() + "/auth/realms/test/");
         String keycloakIdentity = driver.manage().getCookieNamed("KEYCLOAK_IDENTITY").getValue();
 
         // Check identity cookie is signed with HS256
@@ -473,7 +472,7 @@ public class LoginTest extends AbstractTestRealmKeycloakTest {
             oauth.openLoginForm();
             Assert.assertEquals(RequestType.AUTH_RESPONSE, appPage.getRequestType());
 
-            driver.navigate().to(AuthServerTestEnricher.getAuthServerContextRoot() + "/auth/realms/test/");
+            driver.navigate().to(getAuthServerContextRoot() + "/auth/realms/test/");
             keycloakIdentity = driver.manage().getCookieNamed("KEYCLOAK_IDENTITY").getValue();
 
             // Check identity cookie is still signed with HS256

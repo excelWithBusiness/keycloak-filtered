@@ -66,6 +66,9 @@ Analogically, there is the same behaviour for JBoss based app server as for auth
 
     -Dapp.server.debug.port=$PORT
     -Dapp.server.debug.suspend=y
+    
+When you are debugging cluster adapter tests (For example OIDCAdapterClusterTest) you may use ports 7901 and 7902 for the app
+server nodes. Tests are usually using 2 cluster adapter nodes.    
 
 ## Testsuite logging
 
@@ -646,6 +649,46 @@ After you build the distribution, you run this command to setup servers and run 
     -Dauth.server.log.check=false \
     -Dfrontend.console.output=true \
     -Dtest=org.keycloak.testsuite.cluster.**.*Test clean install
+    
+### Cluster tests with Keycloak on Quarkus
+
+Run tests using the `auth-server-cluster-quarkus` profile:
+
+     mvn -f testsuite/integration-arquillian/tests/base/pom.xml clean install \
+     -Pauth-server-cluster-quarkus \
+     -Dsession.cache.owners=2  \
+     -Dtest=AuthenticationSessionFailoverClusterTest
+     
+---
+**NOTE**
+
+Right now, tests are using a H2 database.
+
+To run tests using a different database such as PostgreSQL, add the following properties into the `testsuite/integration-arquillian/servers/auth-server/quarkus/src/main/content/conf/keycloak.properties` configuration file:
+
+```
+# HA using PostgreSQL
+%ha.datasource.dialect=org.hibernate.dialect.PostgreSQL9Dialect
+%ha.datasource.driver = org.postgresql.xa.PGXADataSource
+%ha.datasource.url = jdbc:postgresql://localhost/keycloak
+%ha.datasource.username = keycloak
+%ha.datasource.password = password
+```
+
+The `ha` profile is automatically set when running clustering tests. 
+
+This is temporary and database configuration should be more integrated with the test suite once we review Quarkus configuration.
+
+---
+     
+#### Run cluster tests from IDE on Quarkus
+
+Activate the following profiles:
+
+* `quarkus`
+* `auth-server-cluster-quarkus`
+
+Then run any cluster test as usual.
 
 ### Cluster tests with Keycloak on embedded undertow
 
@@ -735,7 +778,7 @@ By default JBoss-based containers use TCP-based h2 database. It can be configure
 
 b1) For **Undertow** Keycloak backend containers, you can run the tests using the following command (adjust the test specification according to your needs):
 
-  `mvn -Pcache-server-infinispan,auth-servers-crossdc-undertow -Dtest=*.crossdc.* -pl testsuite/integration-arquillian/tests/base clean install`
+  `mvn -Pcache-server-infinispan,auth-servers-crossdc-undertow -Dtest=org.keycloak.testsuite.crossdc.**.*Test -pl testsuite/integration-arquillian/tests/base clean install`
 
 *note: 'cache-server-infinispan' can be replaced by 'cache-server-jdg'*
 
@@ -745,7 +788,7 @@ b1) For **Undertow** Keycloak backend containers, you can run the tests using th
 
 b2) For **JBoss-based** Keycloak backend containers, you can run the tests like this:
 
-  `mvn -Pcache-server-infinispan,auth-servers-crossdc-jboss,auth-server-wildfly -Dtest=*.crossdc.* -pl testsuite/integration-arquillian/tests/base clean install`
+  `mvn -Pcache-server-infinispan,auth-servers-crossdc-jboss,auth-server-wildfly -Dtest=org.keycloak.testsuite.crossdc.**.*Test -pl testsuite/integration-arquillian/tests/base clean install`
 
 *note: 'cache-server-infinispan' can be replaced by 'cache-server-jdg'*
 
@@ -754,7 +797,7 @@ b2) For **JBoss-based** Keycloak backend containers, you can run the tests like 
 **note**:
 For **JBoss-based** Keycloak backend containers on real DB, the previous commands from (a2) and (b2) can be "squashed" into one. E.g.:
 
-  `mvn -f testsuite/integration-arquillian -Dtest=*.crossdc.* -Pcache-server-infinispan,auth-servers-crossdc-jboss,auth-server-wildfly,jpa,db-mariadb clean install`
+  `mvn -f testsuite/integration-arquillian -Dtest=org.keycloak.testsuite.crossdc.**.*Test -Pcache-server-infinispan,auth-servers-crossdc-jboss,auth-server-wildfly,jpa,db-mariadb clean install`
 
 
 #### Run Cross-DC Tests from Intellij IDEA
@@ -911,3 +954,56 @@ When running the test, add the following arguments to the command line:
 ## Java 11 support
 Java 11 requires some arguments to be passed to JVM. Those can be activated using `-Pjava11-auth-server` and
 `-Pjava11-app-server` profiles, respectively.
+
+## Running tests using Quarkus distribution
+
+### Before Everything
+
+Make sure you build the project using the `quarkus` profile as follows:
+
+    mvn -Pdistribution,quarkus clean install
+
+### Running tests
+    
+Run tests using the `auth-server-quarkus` profile:
+
+    mvn -f testsuite/integration-arquillian/tests/base/pom.xml clean install -Pauth-server-quarkus
+    
+### Debug the Server
+    
+Right now, the server runs in a separate process. To debug the server set `auth.server.debug` system property to `true`.
+
+To configure the debugger port, set the `auth.server.debug.port` system property with any valid port number. Default is `5005`. 
+
+## Cookies testing
+In order to reproduce some specific cookies behaviour in browsers (like SameSite policies or 3rd party cookie blocking),
+some subset of tests needs to be ran with different hosts for auth server and app/IdP server in order to simulate third
+party contexts. Those hosts must be different from localhost as that host has some special treatment from browsers. At
+the same time both hosts must use different domains to be considered cross-origin, e.g. `127.0.0.1.nip.io` and
+`127.0.0.1.xip.io`. NOT `app1.127.0.0.1.nip.io` and `app2.127.0.0.1.nip.io`!!
+
+Also, those new cookies policies are currently not yet enabled by default (which will change in the near future). To test
+those policies, you need the latest stable Firefox together with `firefox-strict-cookies` profile. This profile sets the
+browser to Firefox, configures the proper cookies behavior and makes Firefox to run in the headless mode (which is ok
+because this is not UI testing). For debugging purposes you can override the headless mode with `-DfirefoxHeadless=false`. 
+
+**Broker tests:**
+
+    mvn clean install -f testsuite/integration-arquillian/tests/base \
+                      -Pfirefox-strict-cookies \
+                      -Dtest=**.broker.** \
+                      -Dauth.server.host=[some_host] -Dauth.server.host2=[some_other_host]
+
+**JS adapter tests:**
+
+    mvn clean install -f testsuite/integration-arquillian/tests/base \
+                      -Pfirefox-strict-cookies \
+                      -Dtest=**.javascript.** \
+                      -Dauth.server.host=[some_host] -Dauth.server.host2=[some_other_host]
+                      
+**General adapter tests**
+
+    mvn clean install -f testsuite/integration-arquillian/tests/base \
+                       -Pfirefox-strict-cookies \
+                       -Dtest=**.adapter.** \
+                       -Dauth.server.host=[some_host] -Dauth.server.host2=[some_other_host]

@@ -51,9 +51,14 @@ nbproject
 *.tar
 *.zip
 
+# Python byte-compiled files #
+##############################
+*.pyc
+
 # Logs and databases #
 ######################
 *.log
+.attach_pid*
 
 # Maven #
 #########

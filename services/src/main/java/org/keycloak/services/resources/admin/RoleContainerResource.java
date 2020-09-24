@@ -55,11 +55,12 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @resource Roles
@@ -94,13 +95,13 @@ public class RoleContainerResource extends RoleResource {
     @GET
     @NoCache
     @Produces(MediaType.APPLICATION_JSON)
-    public List<RoleRepresentation> getRoles(@QueryParam("search") @DefaultValue("") String search,
-                                             @QueryParam("first") Integer firstResult,
-                                             @QueryParam("max") Integer maxResults,
-                                             @QueryParam("briefRepresentation") @DefaultValue("true") boolean briefRepresentation) {
+    public Stream<RoleRepresentation> getRoles(@QueryParam("search") @DefaultValue("") String search,
+                                               @QueryParam("first") Integer firstResult,
+                                               @QueryParam("max") Integer maxResults,
+                                               @QueryParam("briefRepresentation") @DefaultValue("true") boolean briefRepresentation) {
         auth.roles().requireList(roleContainer);
 
-        Set<RoleModel> roleModels = new HashSet<RoleModel>();
+        Set<RoleModel> roleModels;
 
         if(search != null && search.trim().length() > 0) {
             roleModels = roleContainer.searchForRoles(search, firstResult, maxResults);
@@ -110,15 +111,10 @@ public class RoleContainerResource extends RoleResource {
             roleModels = roleContainer.getRoles();
         }
 
-        List<RoleRepresentation> roles = new ArrayList<RoleRepresentation>();
-        for (RoleModel roleModel : roleModels) {
-            if(briefRepresentation) {
-                roles.add(ModelToRepresentation.toBriefRepresentation(roleModel));  
-            } else {
-                roles.add(ModelToRepresentation.toRepresentation(roleModel));               
-            }
-        }
-        return roles;
+        Function<RoleModel, RoleRepresentation> toRoleRepresentation = briefRepresentation ?
+                ModelToRepresentation::toBriefRepresentation :
+                ModelToRepresentation::toRepresentation;
+        return roleModels.stream().map(toRoleRepresentation);
     }
 
     /**
@@ -293,25 +289,25 @@ public class RoleContainerResource extends RoleResource {
     }
 
     /**
-     * An app-level roles for the specified app for the role's composite
+     * Get client-level roles for the client that are in the role's composite
      *
      * @param roleName role's name (not id!)
-     * @param client
+     * @param clientUuid
      * @return
      */
-    @Path("{role-name}/composites/clients/{client}")
+    @Path("{role-name}/composites/clients/{clientUuid}")
     @GET
     @NoCache
     @Produces(MediaType.APPLICATION_JSON)
     public Set<RoleRepresentation> getClientRoleComposites(final @PathParam("role-name") String roleName,
-                                                                final @PathParam("client") String client) {
+                                                                final @PathParam("clientUuid") String clientUuid) {
         auth.roles().requireView(roleContainer);
         RoleModel role = roleContainer.getRole(roleName);
         if (role == null) {
             throw new NotFoundException("Could not find role");
         }
-        ClientModel clientModel = realm.getClientById(client);
-        if (client == null) {
+        ClientModel clientModel = realm.getClientById(clientUuid);
+        if (clientModel == null) {
             throw new NotFoundException("Could not find client");
 
         }

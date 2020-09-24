@@ -18,6 +18,7 @@
 org.keycloak.provider.ExceptionConverterSpi
 org.keycloak.storage.UserStorageProviderSpi
 org.keycloak.storage.federated.UserFederatedStorageProviderSpi
+org.keycloak.models.ClientSpi
 org.keycloak.models.RealmSpi
 org.keycloak.models.ActionTokenStoreSpi
 org.keycloak.models.CodeToTokenStoreSpi
@@ -80,3 +81,6 @@ org.keycloak.crypto.CekManagementSpi
 org.keycloak.crypto.ContentEncryptionSpi
 org.keycloak.validation.ClientValidationSPI
 org.keycloak.headers.SecurityHeadersSpi
+org.keycloak.services.clientpolicy.ClientPolicySpi
+org.keycloak.services.clientpolicy.condition.ClientPolicyConditionSpi
+org.keycloak.services.clientpolicy.executor.ClientPolicyExecutorSpi

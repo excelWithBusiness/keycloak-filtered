@@ -99,6 +99,10 @@
             </#list>
         </#if>
 
+        <script>
+            var content = <#include "resources/content.json"/>
+        </script>
+
         <#if properties.styles?has_content>
             <#list properties.styles?split(' ') as style>
             <link href="${resourceUrl}/${style}" rel="stylesheet"/>
@@ -130,7 +134,7 @@
                     document.getElementById("landingLoggedInUser").innerHTML = loggedInUserName('${msg("unknownUser")}', '${msg("fullName")}');
                 }
 
-                loadjs("/app/Main.js");
+                loadjs("/Main.js");
 
             }).error(function() {
                 alert('failed to initialize keycloak');
@@ -186,15 +190,11 @@
               <button id="landingSignOutButton" tabindex="0" style="display:none" onclick="keycloak.logout();" class="pf-c-button pf-m-primary" type="button">${msg("doSignOut")}</button>
             </div>
 
-            <div class="pf-l-toolbar__group" style="margin-left: 10px;">
-                <span id="landingLoggedInUser"></span>
-            </div>
-
             <!-- Kebab for mobile -->
             <div class="pf-c-page__header-tools-group">
                 <div id="landingMobileKebab" class="pf-c-dropdown pf-m-mobile" onclick="toggleMobileDropdown();"> <!-- pf-m-expanded -->
                     <button aria-label="Actions" tabindex="0" id="landingMobileKebabButton" class="pf-c-dropdown__toggle pf-m-plain" type="button" aria-expanded="true" aria-haspopup="true">
-                        <i class="fas fa-ellipsis-v" aria-hidden="false"></i>
+                        <svg fill="currentColor" height="1em" width="1em" viewBox="0 0 192 512" aria-hidden="true" role="img" style="vertical-align: -0.125em;"><path d="M96 184c39.8 0 72 32.2 72 72s-32.2 72-72 72-72-32.2-72-72 32.2-72 72-72zM24 80c0 39.8 32.2 72 72 72s72-32.2 72-72S135.8 8 96 8 24 40.2 24 80zm0 352c0 39.8 32.2 72 72 72s72-32.2 72-72-32.2-72-72-72-72 32.2-72 72z" transform=""></path></svg>
                     </button>
                     <ul id="landingMobileDropdown" aria-labelledby="landingMobileKebabButton" class="pf-c-dropdown__menu pf-m-align-right" role="menu" style="display:none">
                         <#if referrer?has_content && referrer_uri?has_content>
@@ -204,14 +204,16 @@
                         </#if>
 
                         <li id="landingSignInLink" role="none" style="display:none">
-                            <a href="#" onclick="keycloak.login();" role="menuitem" tabindex="0" aria-disabled="false" class="pf-c-dropdown__menu-item">${msg("doLogIn")}</a>
+                            <a onclick="keycloak.login();" role="menuitem" tabindex="0" aria-disabled="false" class="pf-c-dropdown__menu-item">${msg("doLogIn")}</a>
                         </li>
                         <li id="landingSignOutLink" role="none" style="display:none">
-                            <a href="#" onclick="keycloak.logout();" role="menuitem" tabindex="0" aria-disabled="false" class="pf-c-dropdown__menu-item">${msg("doSignOut")}</a>
+                            <a onclick="keycloak.logout();" role="menuitem" tabindex="0" aria-disabled="false" class="pf-c-dropdown__menu-item">${msg("doSignOut")}</a>
                         </li>
                     </ul>
                 </div>
             </div>
+
+            <span id="landingLoggedInUser"></span>
 
         </div> <!-- end header tools -->
       </header>
@@ -224,68 +226,54 @@
         </section>
         <section class="pf-c-page__main-section">
           <div class="pf-l-gallery pf-m-gutter">
-            <div class="pf-l-gallery__item">
-              <div class="pf-c-card">
-                <div class="pf-c-card__header pf-c-content">
-                    <h2><i class="pf-icon pf-icon-user"></i>&nbsp${msg("personalInfoHtmlTitle")}</h2>
-                    <h6>${msg("personalInfoIntroMessage")}</h6>
-                </div>
-                <div class="pf-c-card__body pf-c-content">
-                    <h5 id="landingPersonalInfoLink" onclick="toggleReact()"><a href="#/app/personal-info">${msg("personalInfoHtmlTitle")}</a></h5>
-                </div>
-              </div>
-            </div>
-            <div class="pf-l-gallery__item">
-              <div class="pf-c-card">
-                <div class="pf-c-card__header pf-c-content">
-                    <h2><i class="pf-icon pf-icon-security"></i>&nbsp${msg("accountSecurityTitle")}</h2>
-                    <h6>${msg("accountSecurityIntroMessage")}</h6>
-                </div>
-                <div class="pf-c-card__body pf-c-content">
-                    <h5 id="landingSigningInLink" onclick="toggleReact()"><a href="#/app/security/signingin">${msg("signingIn")}</a></h5>
-                    <h5 id="landingDeviceActivityLink" onclick="toggleReact()"><a href="#/app/security/device-activity">${msg("deviceActivityHtmlTitle")}</a></h5>
-                    <h5 id="landingLinkedAccountsLink" style="display:none" onclick="toggleReact()"><a href="#/app/security/linked-accounts">${msg("linkedAccountsHtmlTitle")}</a></h5>
-                </div>
-              </div>
-            </div>
-            <div class="pf-l-gallery__item">
-              <div class="pf-c-card">
-                <div class="pf-c-card__header pf-c-content">
-                    <h2><i class="pf-icon pf-icon-applications"></i>&nbsp${msg("applicationsHtmlTitle")}</h2>
-                    <h6>${msg("applicationsIntroMessage")}</h6>
-                </div>
-                <div class="pf-c-card__body pf-c-content">
-                    <h5 id="landingApplicationsLink" onclick="toggleReact()"><a href="#/app/applications">${msg("applicationsHtmlTitle")}</a></h5>
+            <#assign content=theme.apply("content.json")?eval>
+            <#list content as item>
+              <div class="pf-l-gallery__item pf-c-card" id="landing-${item.id}">
+                <div>
+                  <div class="pf-c-card__header pf-c-content">
+                      <h2>
+                        <#if item.icon??>
+                          <i class="pf-icon ${item.icon}"></i>&nbsp;
+                        <#elseif item.iconSvg??>
+                          <img src="${item.iconSvg}" alt="icon"/>&nbsp;
+                        </#if>
+                        ${msg(item.label)}
+                      </h2>
+                      <#if item.descriptionLabel??>
+                        <p>${msg(item.descriptionLabel)}</p>
+                      </#if>
+                  </div>
+                  <div class="pf-c-card__body pf-c-content">
+                    <#if item.content??>
+                      <#list item.content as sub>
+                        <div id="landing-${sub.id}">
+                          <a onclick="toggleReact(); window.location.hash='${sub.path}'">${msg(sub.label)}</a>
+                        </div>
+                      </#list>
+                    <#else>
+                      <a id="landing-${item.id}" onclick="toggleReact(); window.location.hash = '${item.path}'">${msg(item.label)}</a>
+                    </#if>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="pf-l-gallery__item" id="landingMyResourcesCard" style="display:none">
-              <div class="pf-c-card">
-                <div class="pf-c-card__header pf-c-content">
-                    <h2><i class="pf-icon pf-icon-repository"></i>&nbsp${msg("myResources")}</h2>
-                    <h6>${msg("resourceIntroMessage")}</h6>
-                </div>
-                <div class="pf-c-card__body pf-c-content">
-                    <h5 id="landingMyResourcesLink" onclick="toggleReact()"><a href="#/app/resources">${msg("myResources")}</a></h5>
-                </div>
-              </div>
-            </div>
+            </#list>
           </div>
         </section>
       </main>
     </div>
 </div>
 
-        <script>
-            if (features.isLinkedAccountsEnabled) {
-                document.getElementById("landingLinkedAccountsLink").style.display='block';
-            };
-
-            // Hidden until feature is complete.
-            if (features.isMyResourcesEnabled) {
-                document.getElementById("landingMyResourcesCard").style.display='block';
-            };
-        </script>
+    <script>
+      const removeHidden = (content) => {
+        content.forEach(c => {
+          if (c.hidden && eval(c.hidden)) {
+            document.getElementById('landing-' + c.id).remove();
+          }
+          if (c.content) removeHidden(c.content);
+        });
+      }
+      removeHidden(content);
+    </script>
 
     </body>
 </html>

@@ -58,12 +58,10 @@ import org.keycloak.protocol.oidc.OIDCLoginProtocolService;
 import org.keycloak.protocol.oidc.representations.OIDCConfigurationRepresentation;
 import org.keycloak.protocol.oidc.utils.OIDCResponseType;
 import org.keycloak.representations.AccessToken;
-import org.keycloak.representations.AccessTokenResponse;
 import org.keycloak.representations.IDToken;
 import org.keycloak.representations.JsonWebToken;
 import org.keycloak.representations.RefreshToken;
 import org.keycloak.representations.idm.UserRepresentation;
-import org.keycloak.testsuite.arquillian.AuthServerTestEnricher;
 import org.keycloak.testsuite.runonserver.RunOnServerException;
 import org.keycloak.util.BasicAuthHelper;
 import org.keycloak.util.JsonSerialization;
@@ -92,7 +90,8 @@ import java.util.function.Supplier;
 
 import static org.keycloak.testsuite.admin.Users.getPasswordOf;
 import static org.keycloak.testsuite.util.UIUtils.clickLink;
-import static org.keycloak.testsuite.util.URLUtils.removeDefaultPorts;
+import static org.keycloak.testsuite.util.ServerURLs.getAuthServerContextRoot;
+import static org.keycloak.testsuite.util.ServerURLs.removeDefaultPorts;
 
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
@@ -106,7 +105,7 @@ public class OAuthClient {
     private static final boolean sslRequired = Boolean.parseBoolean(System.getProperty("auth.server.ssl.required"));
 
     static {
-        updateURLs(AuthServerTestEnricher.getAuthServerContextRoot());
+        updateURLs(getAuthServerContextRoot());
     }
 
     // Workaround, but many tests directly use system properties like OAuthClient.AUTH_SERVER_ROOT instead of taking the URL from suite context
@@ -126,7 +125,7 @@ public class OAuthClient {
     private String clientId;
 
     private String redirectUri;
-    
+
     private String kcAction;
 
     private StateParamProvider state;
@@ -513,6 +512,11 @@ public class OAuthClient {
 
     public AccessTokenResponse doTokenExchange(String realm, String token, String targetAudience,
                                                String clientId, String clientSecret) throws Exception {
+        return doTokenExchange(realm, token, targetAudience, clientId, clientSecret, null);
+    }
+
+    public AccessTokenResponse doTokenExchange(String realm, String token, String targetAudience,
+                                               String clientId, String clientSecret, Map<String, String> additionalParams) throws Exception {
         try (CloseableHttpClient client = httpClient.get()) {
             HttpPost post = new HttpPost(getResourceOwnerPasswordCredentialGrantUrl(realm));
 
@@ -521,6 +525,12 @@ public class OAuthClient {
             parameters.add(new BasicNameValuePair(OAuth2Constants.SUBJECT_TOKEN, token));
             parameters.add(new BasicNameValuePair(OAuth2Constants.SUBJECT_TOKEN_TYPE, OAuth2Constants.ACCESS_TOKEN_TYPE));
             parameters.add(new BasicNameValuePair(OAuth2Constants.AUDIENCE, targetAudience));
+
+            if (additionalParams != null) {
+                for (Map.Entry<String, String> entry : additionalParams.entrySet()) {
+                    parameters.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
+                }
+            }
 
             if (clientSecret != null) {
                 String authorization = BasicAuthHelper.createHeader(clientId, clientSecret);
@@ -1212,6 +1222,7 @@ public class OAuthClient {
 
         private String idToken;
         private String accessToken;
+        private String issuedTokenType;
         private String tokenType;
         private int expiresIn;
         private int refreshExpiresIn;
@@ -1247,6 +1258,7 @@ public class OAuthClient {
                 if (statusCode == 200) {
                     idToken = (String) responseJson.get("id_token");
                     accessToken = (String) responseJson.get("access_token");
+                    issuedTokenType = (String) responseJson.get("issued_token_type");
                     tokenType = (String) responseJson.get("token_type");
                     expiresIn = (Integer) responseJson.get("expires_in");
                     refreshExpiresIn = (Integer) responseJson.get("refresh_expires_in");
@@ -1299,6 +1311,10 @@ public class OAuthClient {
 
         public String getRefreshToken() {
             return refreshToken;
+        }
+
+        public String getIssuedTokenType() {
+            return issuedTokenType;
         }
 
         public String getTokenType() {

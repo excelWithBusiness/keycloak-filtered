@@ -25,6 +25,7 @@ import javax.ws.rs.NotFoundException;
 import org.keycloak.Config;
 import org.keycloak.common.ClientConnection;
 import org.keycloak.common.Version;
+import org.keycloak.common.util.UriUtils;
 import org.keycloak.headers.SecurityHeadersProvider;
 import org.keycloak.models.AdminRoles;
 import org.keycloak.models.ClientModel;
@@ -99,6 +100,7 @@ public class AdminConsole {
         protected String userId;
         protected String realm;
         protected String displayName;
+        protected Locale locale;
 
         @JsonProperty("createRealm")
         protected boolean createRealm;
@@ -108,12 +110,13 @@ public class AdminConsole {
         public WhoAmI() {
         }
 
-        public WhoAmI(String userId, String realm, String displayName, boolean createRealm, Map<String, Set<String>> realmAccess) {
+        public WhoAmI(String userId, String realm, String displayName, boolean createRealm, Map<String, Set<String>> realmAccess, Locale locale) {
             this.userId = userId;
             this.realm = realm;
             this.displayName = displayName;
             this.createRealm = createRealm;
             this.realmAccess = realmAccess;
+            this.locale = locale;
         }
 
         public String getUserId() {
@@ -154,6 +157,14 @@ public class AdminConsole {
 
         public void setRealmAccess(Map<String, Set<String>> realmAccess) {
             this.realmAccess = realmAccess;
+        }
+
+        public Locale getLocale() {
+            return locale;
+        }
+
+        public void setLocale(Locale locale) {
+            this.locale = locale;
         }
     }
 
@@ -214,7 +225,9 @@ public class AdminConsole {
             addRealmAccess(realm, user, realmAccess);
         }
 
-        return Response.ok(new WhoAmI(user.getId(), realm.getName(), displayName, createRealm, realmAccess)).build();
+        Locale locale = session.getContext().resolveLocale(user);
+
+        return Response.ok(new WhoAmI(user.getId(), realm.getName(), displayName, createRealm, realmAccess, locale)).build();
     }
 
     private void addRealmAccess(RealmModel realm, UserModel user, Map<String, Set<String>> realmAdminAccess) {
@@ -309,7 +322,7 @@ public class AdminConsole {
 
             // Replace CSP if admin is hosted on different URL
             if (!adminBaseUri.equals(authServerBaseUri)) {
-                session.getProvider(SecurityHeadersProvider.class).options().allowFrameSrc(UriBuilder.fromUri(authServerBaseUri).replacePath("").build().toString());
+                session.getProvider(SecurityHeadersProvider.class).options().allowFrameSrc(UriUtils.getOrigin(authServerBaseUri));
             }
 
             return builder.build();

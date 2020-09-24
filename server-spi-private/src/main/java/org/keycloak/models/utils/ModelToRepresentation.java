@@ -223,8 +223,18 @@ public class ModelToRepresentation {
 
         rep.setRequiredActions(reqActions);
 
-        if (user.getAttributes() != null && !user.getAttributes().isEmpty()) {
-            Map<String, List<String>> attrs = new HashMap<>(user.getAttributes());
+        Map<String, List<String>> attributes = user.getAttributes();
+        Map<String, List<String>> copy = null;
+
+        if (attributes != null) {
+            copy = new HashMap<>(attributes);
+            copy.remove(UserModel.LAST_NAME);
+            copy.remove(UserModel.FIRST_NAME);
+            copy.remove(UserModel.EMAIL);
+            copy.remove(UserModel.USERNAME);
+        }
+        if (attributes != null && !copy.isEmpty()) {
+            Map<String, List<String>> attrs = new HashMap<>(copy);
             rep.setAttributes(attrs);
         }
 
@@ -366,6 +376,8 @@ public class ModelToRepresentation {
         rep.setOfflineSessionMaxLifespan(realm.getOfflineSessionMaxLifespan());
         rep.setClientSessionIdleTimeout(realm.getClientSessionIdleTimeout());
         rep.setClientSessionMaxLifespan(realm.getClientSessionMaxLifespan());
+        rep.setClientOfflineSessionIdleTimeout(realm.getClientOfflineSessionIdleTimeout());
+        rep.setClientOfflineSessionMaxLifespan(realm.getClientOfflineSessionMaxLifespan());
         rep.setAccessCodeLifespan(realm.getAccessCodeLifespan());
         rep.setAccessCodeLifespanUserAction(realm.getAccessCodeLifespanUserAction());
         rep.setAccessCodeLifespanLogin(realm.getAccessCodeLifespanLogin());
@@ -931,11 +943,11 @@ public class ModelToRepresentation {
         return representation;
     }
 
-    public static ResourceRepresentation toRepresentation(Resource model, ResourceServer resourceServer, AuthorizationProvider authorization) {
+    public static ResourceRepresentation toRepresentation(Resource model, String resourceServer, AuthorizationProvider authorization) {
         return toRepresentation(model, resourceServer, authorization, true);
     }
 
-    public static ResourceRepresentation toRepresentation(Resource model, ResourceServer resourceServer, AuthorizationProvider authorization, Boolean deep) {
+    public static ResourceRepresentation toRepresentation(Resource model, String resourceServer, AuthorizationProvider authorization, Boolean deep) {
         ResourceRepresentation resource = new ResourceRepresentation();
 
         resource.setId(model.getId());
@@ -953,8 +965,8 @@ public class ModelToRepresentation {
         KeycloakSession keycloakSession = authorization.getKeycloakSession();
         RealmModel realm = authorization.getRealm();
 
-        if (owner.getId().equals(resourceServer.getId())) {
-            ClientModel clientModel = realm.getClientById(resourceServer.getId());
+        if (owner.getId().equals(resourceServer)) {
+            ClientModel clientModel = realm.getClientById(resourceServer);
             owner.setName(clientModel.getClientId());
         } else {
             UserModel userModel = keycloakSession.users().getUserById(owner.getId(), realm);
@@ -1006,10 +1018,15 @@ public class ModelToRepresentation {
             representation.setResourceName(resource.getName());
             KeycloakSession keycloakSession = authorization.getKeycloakSession();
             RealmModel realm = authorization.getRealm();
-            UserModel owner = keycloakSession.users().getUserById(ticket.getOwner(), realm);
+            UserModel userOwner = keycloakSession.users().getUserById(ticket.getOwner(), realm);
             UserModel requester = keycloakSession.users().getUserById(ticket.getRequester(), realm);
             representation.setRequesterName(requester.getUsername());
-            representation.setOwnerName(owner.getUsername());
+            if (userOwner != null) {
+                representation.setOwnerName(userOwner.getUsername());
+            } else {
+                ClientModel clientOwner = realm.getClientById(ticket.getOwner());
+                representation.setOwnerName(clientOwner.getClientId());
+            }
         }
 
         Scope scope = ticket.getScope();

@@ -23,10 +23,12 @@ fi
 GREP="grep"
 DIRNAME=`dirname "$RESOLVED_NAME"`
 
-SERVER_OPTS="-Dkeycloak.home.dir=$DIRNAME/../ -Dkeycloak.theme.dir=$DIRNAME/../themes -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+SERVER_OPTS="-Dkeycloak.home.dir=$DIRNAME/../ -Djboss.server.config.dir=$DIRNAME/../conf -Dkeycloak.theme.dir=$DIRNAME/../themes -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 
 DEBUG_MODE="${DEBUG:-false}"
 DEBUG_PORT="${DEBUG_PORT:-8787}"
+
+IS_CONFIGURE="false"
 
 while [ "$#" -gt 0 ]
 do
@@ -37,6 +39,13 @@ do
               DEBUG_PORT=$2
               shift
           fi
+          ;;
+      --config-file)
+          SERVER_OPTS="$SERVER_OPTS -Dkeycloak.config.file=$2"
+          shift
+          ;;
+      config)
+          IS_CONFIGURE=true
           ;;
       --)
           shift
@@ -67,6 +76,11 @@ if [ "$DEBUG_MODE" = "true" ]; then
     fi
 fi
 
-CLASSPATH_OPTS="$DIRNAME/../providers/*:$DIRNAME/../lib/keycloak-runner.jar"
+CLASSPATH_OPTS="$DIRNAME/../lib/quarkus-run.jar:$DIRNAME/../lib/main/*"
 
-exec java $JAVA_OPTS $SERVER_OPTS -cp $CLASSPATH_OPTS io.quarkus.runner.GeneratedMain "$@"
+if [ "$IS_CONFIGURE" = true ] ; then
+    echo "Updating the configuration and installing your custom providers, if any. Please wait."
+    exec java -Dquarkus.launch.rebuild=true $JAVA_OPTS $SERVER_OPTS -cp $CLASSPATH_OPTS io.quarkus.bootstrap.runner.QuarkusEntryPoint "$@"
+else
+    exec java $JAVA_OPTS $SERVER_OPTS -cp $CLASSPATH_OPTS io.quarkus.bootstrap.runner.QuarkusEntryPoint "$@"
+fi

@@ -37,6 +37,8 @@ import org.keycloak.models.cache.CacheRealmProvider;
 import org.keycloak.models.cache.UserCache;
 import org.keycloak.provider.Provider;
 import org.keycloak.provider.ProviderFactory;
+import org.keycloak.services.clientpolicy.ClientPolicyManager;
+import org.keycloak.services.clientpolicy.DefaultClientPolicyManager;
 import org.keycloak.sessions.AuthenticationSessionProvider;
 import org.keycloak.storage.ClientStorageManager;
 import org.keycloak.storage.UserStorageManager;
@@ -64,6 +66,7 @@ public class DefaultKeycloakSession implements KeycloakSession {
     private final DefaultKeycloakTransactionManager transactionManager;
     private final Map<String, Object> attributes = new HashMap<>();
     private RealmProvider model;
+    private ClientProvider clientProvider;
     private UserStorageManager userStorageManager;
     private ClientStorageManager clientStorageManager;
     private UserCredentialStoreManager userCredentialStorageManager;
@@ -75,6 +78,7 @@ public class DefaultKeycloakSession implements KeycloakSession {
     private ThemeManager themeManager;
     private TokenManager tokenManager;
     private VaultTranscriber vaultTranscriber;
+    private ClientPolicyManager clientPolicyManager;
 
     public DefaultKeycloakSession(DefaultKeycloakSessionFactory factory) {
         this.factory = factory;
@@ -93,6 +97,16 @@ public class DefaultKeycloakSession implements KeycloakSession {
             return cache;
         } else {
             return getProvider(RealmProvider.class);
+        }
+    }
+
+    private ClientProvider getClientProvider() {
+        // TODO: Extract ClientProvider from CacheRealmProvider and use that instead
+        ClientProvider cache = getProvider(CacheRealmProvider.class);
+        if (cache != null) {
+            return cache;
+        } else {
+            return clientStorageManager();
         }
     }
 
@@ -159,7 +173,7 @@ public class DefaultKeycloakSession implements KeycloakSession {
 
     @Override
     public ClientProvider clientLocalStorage() {
-        return realmLocalStorage();
+        return getProvider(ClientProvider.class);
     }
 
     @Override
@@ -272,6 +286,14 @@ public class DefaultKeycloakSession implements KeycloakSession {
         return model;
     }
 
+    @Override
+    public ClientProvider clients() {
+        if (clientProvider == null) {
+            clientProvider = getClientProvider();
+        }
+        return clientProvider;
+    }
+
 
     @Override
     public UserSessionProvider sessions() {
@@ -321,6 +343,14 @@ public class DefaultKeycloakSession implements KeycloakSession {
         return this.vaultTranscriber;
     }
 
+    @Override
+    public ClientPolicyManager clientPolicy() {
+        if (clientPolicyManager == null) {
+            clientPolicyManager = new DefaultClientPolicyManager(this);
+        }
+        return clientPolicyManager;
+    }
+
     public void close() {
         Consumer<? super Provider> safeClose = p -> {
             try {
@@ -332,4 +362,5 @@ public class DefaultKeycloakSession implements KeycloakSession {
         providers.values().forEach(safeClose);
         closable.forEach(safeClose);
     }
+
 }

@@ -35,8 +35,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import org.jboss.logging.Logger;
+
 import io.smallrye.config.PropertiesConfigSource;
 
+import static org.keycloak.common.util.StringPropertyReplacer.replaceProperties;
 import static org.keycloak.provider.quarkus.MicroProfileConfigProvider.NS_KEYCLOAK;
 import static org.keycloak.provider.quarkus.MicroProfileConfigProvider.NS_QUARKUS;
 
@@ -45,6 +48,7 @@ import static org.keycloak.provider.quarkus.MicroProfileConfigProvider.NS_QUARKU
  */
 public abstract class KeycloakPropertiesConfigSource extends PropertiesConfigSource {
 
+    private static final Logger log = Logger.getLogger(KeycloakPropertiesConfigSource.class);
     static final String KEYCLOAK_PROPERTIES = "keycloak.properties";
 
     KeycloakPropertiesConfigSource(InputStream is, int ordinal) {
@@ -85,6 +89,9 @@ public abstract class KeycloakPropertiesConfigSource extends PropertiesConfigSou
             } else {
                 is = cl.getResourceAsStream(fileName);
             }
+            if (is != null) {
+                log.debug("Loading the server configuration from the classpath");
+            }
             return is;
         }
     }
@@ -99,6 +106,7 @@ public abstract class KeycloakPropertiesConfigSource extends PropertiesConfigSou
             final Path path = Paths.get(fileName);
             if (Files.exists(path)) {
                 try {
+                    log.debugf("Loading the server configuration from %s", fileName);
                     return Files.newInputStream(path);
                 } catch (NoSuchFileException | FileNotFoundException e) {
                     return null;
@@ -113,17 +121,34 @@ public abstract class KeycloakPropertiesConfigSource extends PropertiesConfigSou
 
     private static Map<String, String> transform(Map<String, String> properties) {
         Map<String, String> result = new HashMap<>(properties.size());
-        properties.keySet().forEach(k -> result.put(transformKey(k), properties.get(k)));
+        properties.keySet().forEach(k -> result.put(transformKey(k), replaceProperties(properties.get(k))));
         return result;
     }
 
+    /**
+     * We need a better namespace resolution so that we don't need to add Quarkus extensions manually. Maybe the easiest 
+     * path is to just have the "keycloak" namespace for Keycloak-specific properties.
+     * 
+     * @param key the key to transform
+     * @return the same key but prefixed with the namespace
+     */
     private static String transformKey(String key) {
+        String namespace;
+        String[] keyParts = key.split("\\.");
+        String extension = keyParts[0];
+        String profile = "";
 
-        String namespace, prefix = (key.split("\\."))[0];
+        if (extension.startsWith("%")) {
+            profile = String.format("%s.", keyParts[0]);
+            extension = keyParts[1];
+            key = key.substring(key.indexOf('.') + 1);
+        }
 
-        switch (prefix) {
+        switch (extension) {
+            case "hibernate-orm":
             case "datasource":
             case "http":
+            case "vertx":
             case "log":
                 namespace = NS_QUARKUS;
                 break;
@@ -131,8 +156,7 @@ public abstract class KeycloakPropertiesConfigSource extends PropertiesConfigSou
                 namespace = NS_KEYCLOAK;
         }
 
-        return namespace + "." + key;
+        return profile + namespace + "." + key;
 
     }
-
 }

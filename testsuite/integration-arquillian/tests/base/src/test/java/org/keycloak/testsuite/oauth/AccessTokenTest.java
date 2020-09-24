@@ -45,7 +45,6 @@ import org.keycloak.events.Errors;
 import org.keycloak.jose.jws.JWSHeader;
 import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.jose.jws.JWSInputException;
-import org.keycloak.models.Constants;
 import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
@@ -66,7 +65,6 @@ import org.keycloak.testsuite.AbstractKeycloakTest;
 import org.keycloak.testsuite.ActionURIUtils;
 import org.keycloak.testsuite.AssertEvents;
 import org.keycloak.testsuite.admin.ApiUtil;
-import org.keycloak.testsuite.arquillian.AuthServerTestEnricher;
 import org.keycloak.testsuite.util.ClientBuilder;
 import org.keycloak.testsuite.util.ClientManager;
 import org.keycloak.testsuite.util.OAuthClient;
@@ -106,7 +104,7 @@ import static org.keycloak.testsuite.admin.AbstractAdminTest.loadJson;
 import static org.keycloak.testsuite.admin.ApiUtil.findClientByClientId;
 import static org.keycloak.testsuite.admin.ApiUtil.findUserByUsername;
 import static org.keycloak.testsuite.admin.ApiUtil.findUserByUsernameId;
-import static org.keycloak.testsuite.arquillian.AuthServerTestEnricher.AUTH_SERVER_SSL_REQUIRED;
+import static org.keycloak.testsuite.util.ServerURLs.AUTH_SERVER_SSL_REQUIRED;
 import static org.keycloak.testsuite.util.OAuthClient.AUTH_SERVER_ROOT;
 import static org.keycloak.testsuite.util.ProtocolMapperUtil.createRoleNameMapper;
 import static org.keycloak.testsuite.Assert.assertExpiration;
@@ -1158,6 +1156,53 @@ public class AccessTokenTest extends AbstractKeycloakTest {
             rep.setClientSessionMaxLifespan(originalClientSessionMaxLifespan);
             realm.update(rep);
             clientRepresentation.getAttributes().put(OIDCConfigAttributes.CLIENT_SESSION_MAX_LIFESPAN, null);
+            client.update(clientRepresentation);
+        }
+    }
+
+    @Test
+    public void testClientOfflineSessionMaxLifespan() throws Exception {
+        ClientResource client = ApiUtil.findClientByClientId(adminClient.realm("test"), "test-app");
+        ClientRepresentation clientRepresentation = client.toRepresentation();
+
+        RealmResource realm = adminClient.realm("test");
+        RealmRepresentation rep = realm.toRepresentation();
+        int accessTokenLifespan = rep.getAccessTokenLifespan();
+        Boolean originalOfflineSessionMaxLifespanEnabled = rep.getOfflineSessionMaxLifespanEnabled();
+        Integer originalClientOfflineSessionMaxLifespan = rep.getClientOfflineSessionMaxLifespan();
+
+        try {
+            rep.setOfflineSessionMaxLifespanEnabled(true);
+            realm.update(rep);
+
+            oauth.scope(OAuth2Constants.OFFLINE_ACCESS);
+            oauth.doLogin("test-user@localhost", "password");
+            String code = oauth.getCurrentQuery().get(OAuth2Constants.CODE);
+            OAuthClient.AccessTokenResponse response = oauth.doAccessTokenRequest(code, "password");
+            assertEquals(200, response.getStatusCode());
+            assertExpiration(response.getExpiresIn(), accessTokenLifespan);
+
+            rep.setClientOfflineSessionMaxLifespan(accessTokenLifespan - 100);
+            realm.update(rep);
+
+            String refreshToken = response.getRefreshToken();
+            response = oauth.doRefreshTokenRequest(refreshToken, "password");
+            assertEquals(200, response.getStatusCode());
+            assertExpiration(response.getExpiresIn(), accessTokenLifespan - 100);
+
+            clientRepresentation.getAttributes().put(OIDCConfigAttributes.CLIENT_OFFLINE_SESSION_MAX_LIFESPAN,
+                Integer.toString(accessTokenLifespan - 200));
+            client.update(clientRepresentation);
+
+            refreshToken = response.getRefreshToken();
+            response = oauth.doRefreshTokenRequest(refreshToken, "password");
+            assertEquals(200, response.getStatusCode());
+            assertExpiration(response.getExpiresIn(), accessTokenLifespan - 200);
+        } finally {
+            rep.setOfflineSessionMaxLifespanEnabled(originalOfflineSessionMaxLifespanEnabled);
+            rep.setClientOfflineSessionMaxLifespan(originalClientOfflineSessionMaxLifespan);
+            realm.update(rep);
+            clientRepresentation.getAttributes().put(OIDCConfigAttributes.CLIENT_OFFLINE_SESSION_MAX_LIFESPAN, null);
             client.update(clientRepresentation);
         }
     }
